@@ -1,0 +1,42 @@
+# TD Fraud Analytics — .gitignore
+
+# Generated data files (run python python/fraud_analytics.py --export to regenerate)
+data/*.csv
+plots/*.png
+
+# Keep the data/ and plots/ directories in the repo
+!data/.gitkeep
+!plots/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+.env
+.env.*
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# Java / Maven
+java/target/
+java/.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+
+# Node / Angular
+angular-demo/node_modules/
+angular-demo/dist/
+angular-demo/.angular/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
