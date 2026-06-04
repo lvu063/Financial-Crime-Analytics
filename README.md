@@ -1,89 +1,133 @@
 # TD Financial Crime Analytics
 
-> AML transaction monitoring pipeline and fraud detection framework — built in the context of TD Bank's ongoing Anti-Money Laundering compliance overhaul. Demonstrates production-level Python analytics, SQL pattern detection, and Angular frontend development.
+> AML transaction monitoring pipeline — Python, R, SQL, Java Spring Boot, and Angular TypeScript. Built in the context of TD Bank's ongoing Anti-Money Laundering compliance overhaul. Every component targets a specific TD role.
 
 **Live demo:** [aml-insight-suite.lovable.app](https://aml-insight-suite.lovable.app) 
 
 ---
 
-## Why this project
+## Why this project exists
 
-TD Bank is currently executing one of the largest AML compliance overhauls in Canadian banking history — a multibillion-dollar program to remediate Anti-Money Laundering deficiencies. The analytical work at the heart of that effort is exactly what this project models: detecting suspicious patterns in transaction data before they become regulatory violations.
-
-This project targets three TD roles:
-- **Actuarial Analyst II (Fraud)** — TD Insurance DAI team
-- **Business Insights Analyst II (Fraud)** — TD Insurance DAI team
-- **Financial Crime Risk Investigative Analyst** — TD Financial Crime Risk Management
+In 2024, TD Bank paid a multibillion-dollar regulatory penalty for AML deficiencies — the largest of its kind in Canadian banking history. The bank is now executing a mandatory overhaul of its financial crime monitoring infrastructure. The analytical work at the heart of that effort is exactly what this project models: detecting suspicious transaction patterns before they become regulatory violations.
 
 ---
 
-## Repository Structure
+## Repository structure
 
 ```
 td-fraud-analytics/
+│
 ├── python/
-│   └── fraud_analytics.py          # AML monitoring pipeline — Python + pandas + SQL
+│   └── fraud_analytics.py          # AML pipeline — structuring, velocity, risk scoring
+│
+├── r/
+│   └── fraud_analysis.R            # Statistical anomaly detection + ggplot2 visualisations
+│
 ├── sql/
 │   └── aml_queries.sql             # 5 production-grade AML SQL queries
+│
+├── java/
+│   ├── pom.xml                     # Maven — Spring Boot 3, Java 17
+│   └── src/main/java/com/tdfraud/
+│       ├── TdFraudAnalyticsApplication.java
+│       ├── controller/
+│       │   └── FraudAlertController.java    # REST API — 8 endpoints
+│       └── dto/
+│           ├── TransactionDto.java
+│           ├── AlertSummaryDto.java
+│           └── RiskScoreDto.java
+│
 ├── angular-demo/
 │   └── src/app/
-│       ├── models/                 # TypeScript interfaces
-│       ├── services/               # Reactive Angular service (RxJS)
-│       └── components/             # Transaction monitor + risk dashboard
-├── data/                           # Generated CSVs (run python first)
+│       ├── models/transaction.model.ts      # TypeScript interfaces
+│       ├── services/fraud-analytics.service.ts   # RxJS reactive service
+│       ├── components/transaction-monitor/  # Filtered transaction table
+│       └── app.module.ts
+│
+├── data/                           # Generated CSVs — run Python first
+├── plots/                          # Generated R plots — run R script
 └── docs/
-    └── methodology.md              # AML framework and design decisions
+    └── methodology.md              # AML framework, design decisions, production roadmap
 ```
 
 ---
 
-## Quick Start
+## Quick start
 
 ```bash
+# Python analytics pipeline
 pip install pandas numpy
 python python/fraud_analytics.py --export --sql
+
+# R visualisations (requires R + packages)
+Rscript r/fraud_analysis.R --export
+
+# Java REST API
+cd java && ./mvnw spring-boot:run
+# → http://localhost:8080/api/v1/fraud/kpis
+
+# Angular frontend
+cd angular-demo && npm install && ng serve
+# → http://localhost:4200
 ```
+
+---
+
+## Role mapping
+
+| File | Language | TD role it targets |
+|---|---|---|
+| `python/fraud_analytics.py` | Python · pandas · SQLite | Actuarial Analyst II · Business Insights Analyst II · FCRM Investigative Analyst |
+| `sql/aml_queries.sql` | SQL | All fraud/analytics roles |
+| `r/fraud_analysis.R` | R · ggplot2 | Actuarial Analyst II (Shiny/Posit listed in JD) |
+| `java/controller/FraudAlertController.java` | Java · Spring Boot | Associate Software Engineer L3 · Associate Engineer I |
+| `java/dto/*.java` | Java records | Associate Software Engineer L3 · Associate Engineer I |
+| `angular-demo/services/fraud-analytics.service.ts` | TypeScript · RxJS | Associate Engineer I · Associate Software Engineer L3 |
+| `angular-demo/components/transaction-monitor/` | Angular · TypeScript | Associate Engineer I · Associate Software Engineer L3 |
 
 ---
 
 ## Demo 1 — Python AML Analytics Pipeline
-*Targets: Actuarial Analyst II, Business Insights Analyst II*
 
 ```bash
-python python/fraud_analytics.py              # full report
-python python/fraud_analytics.py --sql        # raw AML SQL queries
-python python/fraud_analytics.py --bilingual  # French/English output
-python python/fraud_analytics.py --export     # save 6 CSVs
+python python/fraud_analytics.py              # full EN report
+python python/fraud_analytics.py --bilingual  # FR/EN output (Montreal DAI team)
+python python/fraud_analytics.py --sql        # run raw SQL queries
+python python/fraud_analytics.py --export     # save 6 CSV files to data/
 ```
 
-**What it detects:**
+**Four detection patterns:**
 
-| Pattern | Method | Regulatory relevance |
+| Pattern | Regulatory basis | Method |
 |---|---|---|
-| Structuring | Amounts clustered $9,500–$9,999 | PCMLTFA s.9 — CTR evasion |
-| High-risk jurisdiction | Counterparty in Cayman Islands, Panama, Nigeria | FINTRAC guidance |
-| Round amount cash | Large round number cash transactions | Layering indicator |
-| High velocity | Rolling 7-day transaction frequency | Account takeover / smurfing |
+| Structuring | PCMLTFA s.9 — CTR evasion | Cash txns between $9,500–$9,999 clustered per customer |
+| High-risk jurisdiction | FINTRAC high-risk list | Transactions with counterparties in Cayman Islands, Panama, Nigeria |
+| Round amount cash | Layering indicator | Large exact-round cash deposits/withdrawals |
+| High velocity | Account takeover / smurfing | Rolling 7-day transaction frequency per customer |
 
-**Customer risk scoring:**
+**Composite customer risk score (0–100):**
 
-| Component | Weight | Source |
-|---|---|---|
-| Base risk rating | 40% | KYC onboarding |
-| Transaction behaviour | 30% | Flagged ratio |
-| PEP status | 20% | Enhanced due diligence |
-| Jurisdiction exposure | 15% | FINTRAC high-risk list |
-| Alert escalations | Additive | Investigation history |
+| Component | Weight |
+|---|---|
+| Base KYC risk rating | 40% |
+| Transaction behaviour (flagged ratio) | 30% |
+| PEP status | 20% |
+| High-risk jurisdiction exposure | 15% |
+| FINTRAC escalation history | +20 additive, capped |
 
 **Sample output:**
 ```
+══════════════════════════════════════════════════════════════════════
+  TD FINANCIAL CRIME ANALYTICS — AML MONITORING REPORT
+  Transactions: 8,000  |  Customers: 500  |  Alerts: 475
+══════════════════════════════════════════════════════════════════════
+
 §1  STRUCTURING DETECTION
   2 customers with potential structuring patterns
 
 §3  CRITICAL RISK CUSTOMERS
 customer_id     segment    composite_risk_score  risk_tier
 C00323       Commercial               100.0   Critical
-C00108       Commercial               100.0   Critical
 
 §5  ALERT PERFORMANCE KPIs
   Total alerts:        475
@@ -94,43 +138,71 @@ C00108       Commercial               100.0   Critical
 ---
 
 ## Demo 2 — AML SQL Queries
-*Production-grade patterns for BigQuery/Snowflake/PostgreSQL*
 
-Five queries demonstrating the SQL skills both fraud analyst JDs require:
+Five production-grade queries in `sql/aml_queries.sql`:
 
-| Query | Pattern demonstrated |
+| Query | SQL patterns |
 |---|---|
-| `structuring_suspects` | GROUP BY + HAVING, JOIN, threshold logic |
-| `high_risk_jurisdiction` | Multi-value IN, aggregation, conditional COUNT |
-| `alert_aging` | Window function: ratio over PARTITION BY analyst |
-| `pep_exposure` | Enhanced due diligence — PEP customer deep-dive |
-| `monthly_trend` | CTE, window function cumulative count, flag rate |
+| `structuring_suspects` | GROUP BY · HAVING · JOIN · threshold range |
+| `high_risk_jurisdiction` | Multi-value IN · conditional COUNT · aggregation |
+| `alert_aging` | Window: ratio over `PARTITION BY` analyst |
+| `pep_exposure` | Boolean filter · multi-column JOIN · NULLIF |
+| `monthly_trend` | CTE · rolling `AVG OVER` · cumulative `SUM OVER` |
 
-**SQL highlight — structuring detection:**
-```sql
-SELECT customer_id, COUNT(*) AS near_threshold_txns,
-       SUM(amount_cad) AS total_amount
-FROM transactions
-WHERE amount_cad BETWEEN 9500 AND 9999.99
-  AND transaction_type IN ('Cash Deposit', 'Cash Withdrawal')
-GROUP BY customer_id
-HAVING COUNT(*) >= 2
-ORDER BY near_threshold_txns DESC
-```
+BigQuery/Snowflake/PostgreSQL compatible — swap `strftime` for `DATE_TRUNC` for BigQuery.
 
 ---
 
-## Demo 3 — Angular Frontend
-*Targets: Associate Engineer I, Associate Software Engineer L3*
+## Demo 3 — R Analytics Module
 
-TypeScript + Angular 17 transaction monitoring dashboard demonstrating:
+```bash
+Rscript r/fraud_analysis.R           # report + on-screen plot
+Rscript r/fraud_analysis.R --export  # save 4 PNG plots to plots/
+```
 
-- **Reactive service** with RxJS BehaviorSubject, combineLatest, shareReplay
-- **OnPush change detection** for performance
-- **Reactive forms** with debounced filter updates
-- **TypeScript interfaces** with strict typing across all models
-- **Angular pipes** for data transformation
-- **Async pipe** for subscription management
+**Four visualisations (ggplot2):**
+- Transaction amount distribution by type — flagged vs clear
+- Monthly volume vs. flagged alerts — dual-axis trend
+- Customer risk tier by segment — stacked proportional bar
+- Structuring zone — cash amount band histogram with $9.5K–$9.999K highlighted
+
+**Statistical method:** Modified IQR anomaly detection — asymmetric fences
+(1.5× lower, 3.0× upper) to account for right-skewed financial data.
+Symmetric fences would flag too many legitimate high-value transactions.
+
+---
+
+## Demo 4 — Java Spring Boot REST API
+
+```bash
+cd java
+./mvnw spring-boot:run
+```
+
+**8 endpoints:**
+```
+GET /api/v1/fraud/kpis
+GET /api/v1/fraud/transactions?page=0&size=25&flaggedOnly=true&minAmount=5000
+GET /api/v1/fraud/transactions/{transactionId}
+GET /api/v1/fraud/alerts?status=Under+Review
+GET /api/v1/fraud/risk-scores?tier=Critical&segment=Commercial
+GET /api/v1/fraud/risk-scores/{customerId}
+GET /api/v1/fraud/structuring
+GET /api/v1/fraud/jurisdiction-exposure
+GET /api/v1/fraud/monthly-trends?year=2024
+```
+
+**Patterns demonstrated:**
+- `@RestController` · `@GetMapping` · `@PathVariable` · `@RequestParam`
+- `ResponseEntity` for explicit HTTP status control
+- Service layer separation — controller never touches data directly
+- Java 17 `record` types for immutable DTOs
+- `@ExceptionHandler` for consistent error responses
+- `@CrossOrigin` for Angular local dev integration
+
+---
+
+## Demo 5 — Angular Frontend
 
 ```bash
 cd angular-demo
@@ -138,113 +210,50 @@ npm install
 ng serve
 ```
 
-**Key Angular patterns shown:**
-- Dependency injection via `@Injectable({ providedIn: 'root' })`
-- Component lifecycle: `ngOnInit` / `ngOnDestroy` with `takeUntil`
-- Template syntax: `*ngFor`, `*ngIf`, `[ngClass]`, `(click)`, `| async`
-- Reactive forms: `FormBuilder`, `formGroup`, `formControlName`
+**Key patterns:**
+- `ChangeDetectionStrategy.OnPush` — prevents unnecessary re-renders on high-frequency table data
+- RxJS `BehaviorSubject` + `combineLatest` — filters applied reactively without imperative logic
+- `shareReplay(1)` — prevents duplicate HTTP calls on multiple subscriptions
+- `FormBuilder` reactive forms with `debounceTime(300)` — smooth filter UX
+- `takeUntil(destroy$)` — proper subscription cleanup in `ngOnDestroy`
+- `async` pipe — no manual subscription management in templates
 
 ---
 
-## Tech Stack
+## Tech stack
 
 | Layer | Technology |
 |---|---|
-| Analytics | Python · pandas · numpy · SQLite |
+| Analytics pipeline | Python · pandas · numpy · SQLite |
+| Statistical modelling | R · ggplot2 · dplyr · IQR anomaly detection |
 | SQL | Window functions · CTEs · CASE · BigQuery-portable |
+| REST API | Java 17 · Spring Boot 3 · Maven · H2 (demo) |
 | Frontend | Angular 17 · TypeScript · RxJS · Reactive Forms |
-| Deployment | Lovable (React demo) · GitHub |
 | Data | 500 customers · 8,000 transactions · 475 alerts (synthetic) |
+
+---
+
+## AML regulatory context
+
+| Regulation | Relevance to this project |
+|---|---|
+| PCMLTFA s.9 | Structuring threshold — $10,000 CTR requirement |
+| FINTRAC | Suspicious transaction reporting · high-risk jurisdiction lists |
+| OSFI E-13 | AML program requirements for federally regulated institutions |
+| FATF | International high-risk jurisdiction designations |
+
+*All data is synthetically generated. Nothing in this repository represents real TD Bank customer, transaction, or operational data.*
 
 ---
 
 ## Bilingual support
 
-The analytics report runs in both English and French:
+French/English output for the Montreal-based TD Insurance DAI team:
 ```bash
 python python/fraud_analytics.py --bilingual
 ```
 
-Output headings, labels, and KPIs render in French — relevant for TD Insurance's Montreal-based DAI team.
-
 ---
 
-## AML Regulatory Context
-
-This project models patterns covered by:
-- **PCMLTFA** — Proceeds of Crime (Money Laundering) and Terrorist Financing Act
-- **FINTRAC** guidance on suspicious transaction reporting
-- **OSFI** guidelines on AML risk management for federally regulated institutions
-- **FATF** high-risk jurisdiction lists
-
-*All data is synthetically generated. Nothing in this project represents real TD Bank customer or transaction data.*
-
----
-
-*Built as a portfolio project targeting financial crime analytics roles at TD Bank. Background in international economics, data engineering, and bilingual communication — strong on analytical rigour and building systems that surface the right signal from noisy data.*
-
----
-
-## Demo 4 — R Analytics Module
-*Targets: Actuarial Analyst II (TD Insurance DAI team)*
-
-```bash
-Rscript r/fraud_analysis.R            # full report + plot
-Rscript r/fraud_analysis.R --export   # save 4 PNG plots
-```
-
-**What it produces:**
-
-| Analysis | Method |
-|---|---|
-| Statistical anomaly detection | IQR method — 1.5× lower, 3× upper fence (right-skewed financial data) |
-| Monthly trend analysis | ggplot2 dual-axis: volume bars + flagged line |
-| Risk tier distribution | Stacked bar by customer segment |
-| Structuring zone detection | Amount band histogram with $9.5K–$9.999K highlight |
-
-Bilingual labels (EN/FR) throughout — relevant for Montreal-based DAI team.
-
----
-
-## Demo 5 — Java Spring Boot REST API
-*Targets: Associate Software Engineer L3, Associate Engineer I*
-
-A production-style REST API exposing the analytics pipeline as endpoints consumable by the Angular frontend.
-
-```
-GET /api/v1/fraud/kpis
-GET /api/v1/fraud/transactions?page=0&size=25&flaggedOnly=true
-GET /api/v1/fraud/transactions/{transactionId}
-GET /api/v1/fraud/alerts?status=Under+Review
-GET /api/v1/fraud/risk-scores?tier=Critical
-GET /api/v1/fraud/structuring
-GET /api/v1/fraud/jurisdiction-exposure
-GET /api/v1/fraud/monthly-trends?year=2024
-```
-
-```bash
-cd java
-./mvnw spring-boot:run
-# API available at http://localhost:8080
-```
-
-**Patterns demonstrated:**
-- `@RestController` with proper HTTP verb mapping
-- `ResponseEntity` for HTTP status control
-- Service layer separation — controller never touches data
-- Java records (Java 16+) for immutable DTOs
-- `@ExceptionHandler` for consistent error responses
-- `@CrossOrigin` for Angular local dev integration
-
----
-
-## Complete Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Analytics | Python · pandas · numpy · SQLite |
-| Statistical modelling | R · ggplot2 · dplyr · IQR anomaly detection |
-| REST API | Java 17 · Spring Boot 3 · Maven |
-| Frontend | Angular 17 · TypeScript · RxJS · Reactive Forms |
-| SQL | Window functions · CTEs · CASE · BigQuery-portable |
-| Deployment | Lovable demo · GitHub |
+*Background in international economics, data engineering, and bilingual communication.
+Built to demonstrate production-level analytical thinking applied to real financial crime problems.*
