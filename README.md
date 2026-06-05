@@ -1,8 +1,11 @@
 # TD Financial Crime Analytics
 
-> AML transaction monitoring pipeline — Python, R, SQL, Java Spring Boot, and Angular TypeScript. Built in the context of TD Bank's ongoing Anti-Money Laundering compliance overhaul. Every component targets a specific TD role.
+> AML transaction monitoring pipeline — Python, R, SQL, Java Spring Boot, Angular TypeScript, MLOps monitoring. Structuring detection, velocity analysis, customer risk scoring. Deployed on AWS EC2. CI/CD via GitHub Actions.
 
 **Live demo:** [aml-insight-suite.lovable.app](https://aml-insight-suite.lovable.app) 
+
+
+**Deployed:** AWS EC2 (t2.micro, Amazon Linux 2023) · Docker containerised
 
 ---
 
@@ -16,18 +19,15 @@ In 2024, TD Bank paid a multibillion-dollar regulatory penalty for AML deficienc
 
 ```
 td-fraud-analytics/
-│
 ├── python/
-│   └── fraud_analytics.py          # AML pipeline — structuring, velocity, risk scoring
-│
+│   ├── fraud_analytics.py              # AML pipeline — structuring, velocity, risk scoring
+│   └── mlops_monitor.py                # Model drift detection + data quality monitoring
 ├── r/
-│   └── fraud_analysis.R            # Statistical anomaly detection + ggplot2 visualisations
-│
+│   └── fraud_analysis.R                # Statistical anomaly detection + ggplot2 visualisations
 ├── sql/
-│   └── aml_queries.sql             # 5 production-grade AML SQL queries
-│
+│   └── aml_queries.sql                 # 5 production-grade AML SQL queries
 ├── java/
-│   ├── pom.xml                     # Maven — Spring Boot 3, Java 17
+│   ├── pom.xml                         # Maven — Spring Boot 3, Java 17
 │   └── src/main/java/com/tdfraud/
 │       ├── TdFraudAnalyticsApplication.java
 │       ├── controller/
@@ -36,18 +36,20 @@ td-fraud-analytics/
 │           ├── TransactionDto.java
 │           ├── AlertSummaryDto.java
 │           └── RiskScoreDto.java
-│
 ├── angular-demo/
 │   └── src/app/
 │       ├── models/transaction.model.ts      # TypeScript interfaces
 │       ├── services/fraud-analytics.service.ts   # RxJS reactive service
 │       ├── components/transaction-monitor/  # Filtered transaction table
 │       └── app.module.ts
-│
-├── data/                           # Generated CSVs — run Python first
-├── plots/                          # Generated R plots — run R script
-└── docs/
-    └── methodology.md              # AML framework, design decisions, production roadmap
+├── .github/
+│   └── workflows/ci-cd.yml             # GitHub Actions: test → lint → build → deploy
+├── docs/
+│   ├── methodology.md                  # AML framework, design decisions, production roadmap
+│   └── agile/
+│       └── PROJECT_MANAGEMENT.md       # Sprint plan, WBS, risk register
+├── data/                               # Generated CSVs (gitignored)
+└── plots/                              # Generated R plots (gitignored)
 ```
 
 ---
@@ -55,18 +57,20 @@ td-fraud-analytics/
 ## Quick start
 
 ```bash
-# Python analytics pipeline
 pip install pandas numpy
 python python/fraud_analytics.py --export --sql
+```
 
-# R visualisations (requires R + packages)
+```bash
 Rscript r/fraud_analysis.R --export
+```
 
-# Java REST API
+```bash
 cd java && ./mvnw spring-boot:run
 # → http://localhost:8080/api/v1/fraud/kpis
+```
 
-# Angular frontend
+```bash
 cd angular-demo && npm install && ng serve
 # → http://localhost:4200
 ```
@@ -75,19 +79,23 @@ cd angular-demo && npm install && ng serve
 
 ## Role mapping
 
-| File | Language | TD role it targets |
+| File | Language | Role it targets |
 |---|---|---|
 | `python/fraud_analytics.py` | Python · pandas · SQLite | Actuarial Analyst II · Business Insights Analyst II · FCRM Investigative Analyst |
-| `sql/aml_queries.sql` | SQL | All fraud/analytics roles |
+| `python/mlops_monitor.py` | Python · numpy | Data Services Developer · Platform Developer · DevOps roles |
+| `sql/aml_queries.sql` | SQL | All fraud/analytics/data engineering roles |
 | `r/fraud_analysis.R` | R · ggplot2 | Actuarial Analyst II (Shiny/Posit listed in JD) |
-| `java/controller/FraudAlertController.java` | Java · Spring Boot | Associate Software Engineer L3 · Associate Engineer I |
-| `java/dto/*.java` | Java records | Associate Software Engineer L3 · Associate Engineer I |
-| `angular-demo/services/fraud-analytics.service.ts` | TypeScript · RxJS | Associate Engineer I · Associate Software Engineer L3 |
-| `angular-demo/components/transaction-monitor/` | Angular · TypeScript | Associate Engineer I · Associate Software Engineer L3 |
+| `java/controller/` | Java · Spring Boot | Associate Software Engineer L3 · Associate Engineer I |
+| `java/dto/*.java` | Java 17 records | Associate Software Engineer L3 · Associate Engineer I |
+| `angular-demo/services/` | TypeScript · RxJS | Associate Engineer I · Associate Software Engineer L3 |
+| `angular-demo/components/` | Angular · TypeScript | Associate Engineer I · Associate Software Engineer L3 |
+| `.github/workflows/ci-cd.yml` | GitHub Actions | CI/CD · DevOps · Data Services Developer |
+| `docs/agile/` | Markdown | Agile · Scrum · project management |
 
 ---
 
 ## Demo 1 — Python AML Analytics Pipeline
+*Targets: Actuarial Analyst II · Business Insights Analyst II · FCRM Investigative Analyst*
 
 ```bash
 python python/fraud_analytics.py              # full EN report
@@ -101,9 +109,9 @@ python python/fraud_analytics.py --export     # save 6 CSV files to data/
 | Pattern | Regulatory basis | Method |
 |---|---|---|
 | Structuring | PCMLTFA s.9 — CTR evasion | Cash txns between $9,500–$9,999 clustered per customer |
-| High-risk jurisdiction | FINTRAC high-risk list | Transactions with counterparties in Cayman Islands, Panama, Nigeria |
-| Round amount cash | Layering indicator | Large exact-round cash deposits/withdrawals |
 | High velocity | Account takeover / smurfing | Rolling 7-day transaction frequency per customer |
+| High-risk jurisdiction | FINTRAC high-risk list | Counterparties in Cayman Islands, Panama, Nigeria |
+| Round amount cash | Layering indicator | Large exact-round cash deposits/withdrawals |
 
 **Composite customer risk score (0–100):**
 
@@ -137,7 +145,32 @@ C00323       Commercial               100.0   Critical
 
 ---
 
-## Demo 2 — AML SQL Queries
+## Demo 2 — MLOps Model Monitoring
+*Targets: Data Services Developer · Platform Developer · DevOps/MLOps roles*
+
+```bash
+python python/fraud_analytics.py --export     # generate data first
+python python/mlops_monitor.py --baseline     # set baseline
+python python/mlops_monitor.py --report       # check for drift
+```
+
+**What it monitors:**
+
+| Check | Method |
+|---|---|
+| Transaction amount drift | Population Stability Index (PSI) — industry standard MLOps metric |
+| Alert flag rate drift | % change vs baseline threshold |
+| Structuring detection rate | % change vs baseline |
+| Data quality | 5 automated rules on every batch |
+
+PSI thresholds: < 0.1 (stable) · < 0.2 (investigate) · ≥ 0.2 (model drift)
+
+In production this would run on a schedule via Airflow and alert via Slack when thresholds are breached.
+
+---
+
+## Demo 3 — AML SQL Queries
+*Targets: All fraud/analytics/data engineering roles*
 
 Five production-grade queries in `sql/aml_queries.sql`:
 
@@ -153,30 +186,29 @@ BigQuery/Snowflake/PostgreSQL compatible — swap `strftime` for `DATE_TRUNC` fo
 
 ---
 
-## Demo 3 — R Analytics Module
+## Demo 4 — R Analytics Module
+*Targets: Actuarial Analyst II (Shiny/Posit listed in JD)*
 
 ```bash
 Rscript r/fraud_analysis.R           # report + on-screen plot
 Rscript r/fraud_analysis.R --export  # save 4 PNG plots to plots/
 ```
 
-**Four visualisations (ggplot2):**
+Four ggplot2 visualisations:
 - Transaction amount distribution by type — flagged vs clear
 - Monthly volume vs. flagged alerts — dual-axis trend
 - Customer risk tier by segment — stacked proportional bar
 - Structuring zone — cash amount band histogram with $9.5K–$9.999K highlighted
 
-**Statistical method:** Modified IQR anomaly detection — asymmetric fences
-(1.5× lower, 3.0× upper) to account for right-skewed financial data.
-Symmetric fences would flag too many legitimate high-value transactions.
+**Statistical method:** Modified IQR anomaly detection — asymmetric fences (1.5× lower, 3.0× upper) to account for right-skewed financial data. Symmetric fences would flag too many legitimate high-value transactions.
 
 ---
 
-## Demo 4 — Java Spring Boot REST API
+## Demo 5 — Java Spring Boot REST API
+*Targets: Associate Software Engineer L3 · Associate Engineer I*
 
 ```bash
-cd java
-./mvnw spring-boot:run
+cd java && ./mvnw spring-boot:run
 ```
 
 **8 endpoints:**
@@ -192,57 +224,82 @@ GET /api/v1/fraud/jurisdiction-exposure
 GET /api/v1/fraud/monthly-trends?year=2024
 ```
 
-**Patterns demonstrated:**
-- `@RestController` · `@GetMapping` · `@PathVariable` · `@RequestParam`
-- `ResponseEntity` for explicit HTTP status control
-- Service layer separation — controller never touches data directly
-- Java 17 `record` types for immutable DTOs
-- `@ExceptionHandler` for consistent error responses
-- `@CrossOrigin` for Angular local dev integration
+Patterns demonstrated: `@RestController` · `ResponseEntity` · service layer separation · Java 17 `record` DTOs · `@ExceptionHandler` · `@CrossOrigin`
 
 ---
 
-## Demo 5 — Angular Frontend
+## Demo 6 — Angular Frontend
+*Targets: Associate Engineer I · Associate Software Engineer L3*
 
 ```bash
-cd angular-demo
-npm install
-ng serve
+cd angular-demo && npm install && ng serve
 ```
 
-**Key patterns:**
-- `ChangeDetectionStrategy.OnPush` — prevents unnecessary re-renders on high-frequency table data
-- RxJS `BehaviorSubject` + `combineLatest` — filters applied reactively without imperative logic
-- `shareReplay(1)` — prevents duplicate HTTP calls on multiple subscriptions
-- `FormBuilder` reactive forms with `debounceTime(300)` — smooth filter UX
-- `takeUntil(destroy$)` — proper subscription cleanup in `ngOnDestroy`
-- `async` pipe — no manual subscription management in templates
+`ChangeDetectionStrategy.OnPush` · RxJS `BehaviorSubject` + `combineLatest` · `shareReplay(1)` · `FormBuilder` reactive forms with `debounceTime(300)` · `takeUntil(destroy$)` · `async` pipe
 
 ---
 
-## Tech stack
+## CI/CD Pipeline
+
+```
+push to main
+    │
+    ├── 1. Test     → pytest + data quality validation
+    ├── 2. Lint     → flake8 code quality
+    ├── 3. Build    → Docker image → Docker Hub
+    └── 4. Deploy   → SSH to AWS EC2
+```
+
+See `.github/workflows/ci-cd.yml`.
+
+**Required GitHub secrets:** `DOCKERHUB_USERNAME` · `DOCKERHUB_TOKEN` · `EC2_HOST` · `EC2_SSH_KEY`
+
+---
+
+## AWS EC2 Deployment
+
+```bash
+docker pull [YOUR_DOCKERHUB]/td-fraud-analytics:latest
+docker run -d -p 8000:8000 --name td-fraud-analytics \
+  --restart unless-stopped \
+  [YOUR_DOCKERHUB]/td-fraud-analytics:latest
+```
+
+---
+
+## Agile documentation
+
+Sprint plan, WBS, risk register, and definition of done in `docs/agile/PROJECT_MANAGEMENT.md`.
+
+3 sprints · 63 story points · 100% velocity
+
+---
+
+## Complete tech stack
 
 | Layer | Technology |
 |---|---|
 | Analytics pipeline | Python · pandas · numpy · SQLite |
+| MLOps monitoring | PSI drift detection · data quality checks |
 | Statistical modelling | R · ggplot2 · dplyr · IQR anomaly detection |
 | SQL | Window functions · CTEs · CASE · BigQuery-portable |
-| REST API | Java 17 · Spring Boot 3 · Maven · H2 (demo) |
+| REST API | Java 17 · Spring Boot 3 · Maven |
 | Frontend | Angular 17 · TypeScript · RxJS · Reactive Forms |
+| CI/CD | GitHub Actions (test → lint → build → deploy) |
+| Cloud | AWS EC2 · Docker · Docker Hub |
+| Agile | Scrum · user stories · sprint backlog · retrospective |
 | Data | 500 customers · 8,000 transactions · 475 alerts (synthetic) |
 
 ---
 
 ## AML regulatory context
 
-| Regulation | Relevance to this project |
+| Regulation | Relevance |
 |---|---|
 | PCMLTFA s.9 | Structuring threshold — $10,000 CTR requirement |
 | FINTRAC | Suspicious transaction reporting · high-risk jurisdiction lists |
 | OSFI E-13 | AML program requirements for federally regulated institutions |
 | FATF | International high-risk jurisdiction designations |
-
-*All data is synthetically generated. Nothing in this repository represents real TD Bank customer, transaction, or operational data.*
 
 ---
 
@@ -251,6 +308,11 @@ ng serve
 French/English output for the Montreal-based TD Insurance DAI team:
 ```bash
 python python/fraud_analytics.py --bilingual
+```
+
+---
+
+*Background in international economics, data engineering, and bilingual communication. Built to demonstrate production-level analytical thinking applied to real financial crime problems. Nothing in this repository represents real TD Bank customer or operational data.*
 ```
 
 ---
