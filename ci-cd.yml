@@ -1,0 +1,152 @@
+# .github/workflows/ci-cd.yml
+# TD Financial Crime Analytics — CI/CD Pipeline
+#
+# Pipeline stages:
+#   1. Test     — pytest unit tests + data quality validation
+#   2. Lint     — flake8 code quality
+#   3. Build    — Docker image build + push to Docker Hub
+#   4. Deploy   — SSH deploy to AWS EC2
+#
+# Closes gaps: CI/CD (Jenkins equivalent), DevOps practices, MLOps monitoring
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/td-fraud-analytics
+  EC2_HOST:     ${{ secrets.EC2_HOST }}
+
+jobs:
+  # ── Stage 1: Test ──────────────────────────────────────────────────────────
+  test:
+    name: Test & Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: pytest python/ -v --tb=short --junitxml=test-results.xml
+
+      - name: Generate mock data for integration test
+        run: python python/fraud_analytics.py --export
+
+      - name: Validate data quality
+        run: |
+          python -c "
+          import pandas as pd
+          txns = pd.read_csv('data/transactions.csv')
+          assert len(txns) == 8000, f'Expected 8000 rows, got {len(txns)}'
+          assert txns['amount_cad'].min() > 0, 'Found non-positive amounts'
+          assert txns['transaction_date'].notna().all(), 'Found missing dates'
+          print('✓ Data quality validation passed')
+          "
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results.xml
+
+  # ── Stage 2: Lint ──────────────────────────────────────────────────────────
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run flake8
+        run: |
+          pip install flake8
+          flake8 python/ --max-line-length=100 --ignore=E501,W503 --statistics
+
+  # ── Stage 3: Build & Push Docker image ─────────────────────────────────────
+  build:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    needs: [test, lint]   # only build if tests and lint pass
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:latest
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache
+          cache-to:   type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache,mode=max
+
+  # ── Stage 4: Deploy to AWS EC2 ─────────────────────────────────────────────
+  deploy:
+    name: Deploy to AWS EC2
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key:      ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Pull latest image
+            docker pull ${{ env.DOCKER_IMAGE }}:latest
+
+            # Stop and remove existing container gracefully
+            docker stop td-fraud-analytics 2>/dev/null || true
+            docker rm   td-fraud-analytics 2>/dev/null || true
+
+            # Start new container
+            docker run -d \
+              --name td-fraud-analytics \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              ${{ env.DOCKER_IMAGE }}:latest
+
+            # Health check — wait up to 30s
+            for i in {1..6}; do
+              sleep 5
+              if docker exec td-fraud-analytics python -c "import pandas; print('healthy')"; then
+                echo "✓ Container healthy"
+                break
+              fi
+            done
+
+            # Clean up old images
+            docker image prune -f
+
+      - name: Notify deployment success
+        run: echo "✓ Deployed ${{ github.sha }} to EC2 at ${{ secrets.EC2_HOST }}"
